@@ -39,8 +39,9 @@ final class MainViewController: CAPBridgeViewController {
     }
 
     // A swipe from the bottom edge (where the card hand is) should not leave the game on the first try.
+    // (The home indicator itself is hidden by Capacitor's SystemBars plugin: `SystemBars.hidden` in capacitor.config.ts;
+    // CAPBridgeViewController already overrides prefersHomeIndicatorAutoHidden as a non-open property.)
     override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge { .all }
-    override var prefersHomeIndicatorAutoHidden: Bool { true }
 
     #if DEBUG
     // UI tests open a specific screen with the launch argument `-AXDStartPath /collection` (Debug builds only).

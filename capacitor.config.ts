@@ -26,6 +26,11 @@ const config: CapacitorConfig = {
     allowsLinkPreview: false,
   },
   plugins: {
+    // Capacitor 8 core plugin: hidden=true hides the status bar AND auto-hides the home indicator. With the default (false)
+    // its load() would show the status bar again despite UIStatusBarHidden in Info.plist.
+    SystemBars: {
+      hidden: true,
+    },
     PushNotifications: {
       presentationOptions: ['banner', 'list', 'sound', 'badge'],
     },
