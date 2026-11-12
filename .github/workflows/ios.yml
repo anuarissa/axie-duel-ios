@@ -1,0 +1,108 @@
+name: iOS shell (simulator)
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-sim-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sim:
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      AXD_CI: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Select the newest Xcode 26
+        run: |
+          X=$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)
+          echo "DEVELOPER_DIR=$X/Contents/Developer" >> "$GITHUB_ENV"
+          echo "Using $X"
+      - name: Check the iOS SDK (App Store requires 26+)
+        run: |
+          xcodebuild -version
+          v=$(xcrun --sdk iphoneos --show-sdk-version); echo "iOS SDK $v"
+          [ "${v%%.*}" -ge 26 ] || { echo "Need the iOS 26 SDK"; exit 1; }
+
+      - run: npm ci --ignore-scripts
+      - name: Generate ios/ from the Capacitor template
+        run: bash scripts/gen-ios.sh
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/spm
+          key: spm-x26-${{ hashFiles('package-lock.json') }}
+
+      - name: Pick an iPhone 17 Pro Max simulator (newest iOS 26 runtime)
+        run: |
+          UDID=$(xcrun simctl list devices available --json | python3 -c '
+          import json, sys
+          devs = json.load(sys.stdin)["devices"]
+          rows = [(k, d) for k, v in devs.items() if "iOS-26" in k for d in v]
+          best = [r for r in rows if r[1]["name"] == "iPhone 17 Pro Max"] or [r for r in rows if r[1]["name"].startswith("iPhone")]
+          best.sort(key=lambda r: r[0])
+          print(best[-1][1]["udid"] if best else "")
+          ')
+          [ -n "$UDID" ] || { xcrun simctl list devices available; exit 1; }
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          echo "Simulator $UDID"
+
+      - name: Build for testing (simulator, unsigned)
+        run: |
+          set -o pipefail
+          mkdir -p build
+          xcodebuild -project ios/App/App.xcodeproj -scheme AppUITests -destination "id=$UDID" \
+            -derivedDataPath build/dd -clonedSourcePackagesDirPath ~/spm CODE_SIGNING_ALLOWED=NO \
+            build-for-testing > build/build-sim.log 2>&1 || { tail -80 build/build-sim.log; exit 1; }
+          tail -5 build/build-sim.log
+
+      - name: Build Release for device (unsigned; catches device-only errors)
+        run: |
+          set -o pipefail
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release -destination 'generic/platform=iOS' \
+            -derivedDataPath build/dd-device -clonedSourcePackagesDirPath ~/spm CODE_SIGNING_ALLOWED=NO \
+            build > build/build-device.log 2>&1 || { tail -80 build/build-device.log; exit 1; }
+          tail -5 build/build-device.log
+
+      - name: UI test with video and screenshots
+        run: |
+          mkdir -p build/shots
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl io "$UDID" recordVideo --codec=h264 --force build/run.mp4 &
+          REC=$!
+          set +e
+          TEST_RUNNER_AXD_SHOTS_DIR="$PWD/build/shots" xcodebuild test-without-building \
+            -project ios/App/App.xcodeproj -scheme AppUITests -destination "id=$UDID" \
+            -derivedDataPath build/dd -clonedSourcePackagesDirPath ~/spm \
+            -resultBundlePath build/UITests.xcresult > build/uitest.log 2>&1
+          RC=$?
+          kill -INT "$REC"; wait "$REC" 2>/dev/null
+          tail -40 build/uitest.log
+          ls -la build/shots
+          exit $RC
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: ios-sim-${{ github.run_number }}
+          path: |
+            build/shots
+            build/run.mp4
+            build/UITests.xcresult
+            build/*.log
+          retention-days: 14
+          if-no-files-found: warn
