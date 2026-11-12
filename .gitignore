@@ -1,0 +1,9 @@
+/node_modules/
+/ios/
+/build/
+*.p8
+*.p12
+*.mobileprovision
+*.cer
+*.key
+.DS_Store

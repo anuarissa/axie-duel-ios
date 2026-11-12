@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Axie Duel</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body {
+    margin: 0; height: 100%;
+    background: radial-gradient(120% 90% at 50% 0%, #2a0f4a 0%, #0a0117 62%);
+    color: #f4eefc; font-family: -apple-system, system-ui, sans-serif;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  }
+  main {
+    height: 100%; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; text-align: center;
+    padding: 0 max(24px, env(safe-area-inset-right)) 0 max(24px, env(safe-area-inset-left));
+  }
+  h1 { margin: 0; font-size: 22px; letter-spacing: -0.01em; }
+  p { margin: 0; max-width: 30em; opacity: .82; line-height: 1.5; }
+  button {
+    margin-top: 6px; font: 600 16px/1 -apple-system, system-ui, sans-serif; color: #1b0b2e;
+    background: linear-gradient(#ffe08a, #f2b84b); border: 0; border-radius: 12px; padding: 14px 28px;
+  }
+  button:active { transform: translateY(1px); opacity: .9; }
+</style>
+</head>
+<body>
+<main>
+  <h1>You're offline</h1>
+  <p>Axie Duel needs an internet connection. Check your connection and try again.</p>
+  <button id="retry" type="button">Try again</button>
+</main>
+<script>
+(function () {
+  var GAME = 'https://axie-duel.com/?src=ios';
+  function tries() { try { return +sessionStorage.getItem('axdRetry') || 0; } catch (e) { return 0; } }
+  function go() {
+    try { sessionStorage.setItem('axdRetry', String(tries() + 1)); } catch (e) {}
+    location.replace(GAME);
+  }
+  document.getElementById('retry').addEventListener('click', go);
+  window.addEventListener('online', go);
+  // One automatic retry per session when the device reports a connection (avoids a loop if the server is down).
+  if (navigator.onLine && tries() < 1) setTimeout(go, 1500);
+})();
+</script>
+</body>
+</html>
