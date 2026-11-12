@@ -49,6 +49,10 @@ unless tests
 end
 tests.build_configurations.each do |config|
   s = config.build_settings
+  # Without PRODUCT_NAME the bundle is "-Runner.app/PlugIns/.xctest" and two build steps write the same file (CI run 1).
+  s['PRODUCT_NAME'] = '$(TARGET_NAME)'
+  s['MARKETING_VERSION'] = '1.0'
+  s['CURRENT_PROJECT_VERSION'] = '1'
   s['TEST_TARGET_NAME'] = 'App'
   s['PRODUCT_BUNDLE_IDENTIFIER'] = 'com.axieduel.app.uitests'
   s['GENERATE_INFOPLIST_FILE'] = 'YES'
