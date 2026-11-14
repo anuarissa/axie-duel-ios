@@ -1,6 +1,6 @@
 # Axie Duel changes to the Capacitor Xcode project (runs on macOS CI after `cap add ios`).
 #   ruby native/ios/patch-project.rb ios/App/App.xcodeproj
-# - iPhone only, iOS 15+, entitlements (push), privacy manifest, no Mac / Vision Pro "designed for iPhone".
+# - iPhone only, iOS 15.4+ (CSS :has(), used by the compact battle layout), entitlements (push), privacy manifest, no Mac / Vision Pro "designed for iPhone".
 # - AppUITests target + shared schemes "App" (build/archive) and "AppUITests" (simulator UI test).
 # - Release signing (manual, Apple Distribution + "Axie Duel App Store" profile) only when TEAM_ID is set (release workflow).
 require 'xcodeproj'
@@ -13,7 +13,7 @@ app_group = project.main_group.find_subpath('App', false) or abort('App group no
 app.build_configurations.each do |config|
   s = config.build_settings
   s['TARGETED_DEVICE_FAMILY'] = '1'
-  s['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+  s['IPHONEOS_DEPLOYMENT_TARGET'] = '15.4'
   s['CODE_SIGN_ENTITLEMENTS'] = 'App/App.entitlements'
   s['SUPPORTS_MACCATALYST'] = 'NO'
   s['SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD'] = 'NO'
@@ -41,7 +41,7 @@ end
 # UI test target (simulator only; never archived).
 tests = project.targets.find { |t| t.name == 'AppUITests' }
 unless tests
-  tests = project.new_target(:ui_test_bundle, 'AppUITests', :ios, '15.0')
+  tests = project.new_target(:ui_test_bundle, 'AppUITests', :ios, '15.4')
   tests.add_dependency(app)
   group = project.main_group.find_subpath('AppUITests', false) || project.main_group.new_group('AppUITests', 'AppUITests')
   source = group.new_reference('AppUITests.swift')
@@ -58,7 +58,7 @@ tests.build_configurations.each do |config|
   s['GENERATE_INFOPLIST_FILE'] = 'YES'
   s['SWIFT_VERSION'] = '5.0'
   s['TARGETED_DEVICE_FAMILY'] = '1'
-  s['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+  s['IPHONEOS_DEPLOYMENT_TARGET'] = '15.4'
   s['CODE_SIGNING_ALLOWED'] = 'NO'
 end
 
@@ -75,4 +75,4 @@ test_scheme.add_test_target(tests)
 test_scheme.set_launch_target(app)
 test_scheme.save_as(path, 'AppUITests', true)
 
-puts "patched #{path}: App (iPhone, iOS 15+, push entitlements, privacy manifest#{team.empty? ? '' : ', release signing'}) + AppUITests"
+puts "patched #{path}: App (iPhone, iOS 15.4+, push entitlements, privacy manifest#{team.empty? ? '' : ', release signing'}) + AppUITests"
